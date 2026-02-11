@@ -1,5 +1,6 @@
 Invoke-WebRequest -Uri "https://nssm.cc/release/nssm-2.24.zip" -OutFile "C:\nssm.zip"
 Expand-Archive -Path "C:\nssm.zip" -DestinationPath "C:\nssm"
+C:\nssm\nssm-2.24\win64\nssm.exe install ADAutomation
 
 Lock-ADAccount -Identity temp30 -ErrorAction Stop
 Disable-ADAccount -Identity $UPN -ErrorAction Stop
