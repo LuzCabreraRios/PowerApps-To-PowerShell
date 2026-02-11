@@ -2,10 +2,9 @@ from flask import Flask, request, jsonify
 import subprocess, os
 import sys
 from dotenv import load_dotenv
-from waitress import serve # pip install waitress
+from waitress import serve 
 
 # 1. Force Absolute Paths
-# Get the folder where this python script is located
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ENV_PATH = os.path.join(BASE_DIR, ".env")
 SCRIPT_PATH = os.path.join(BASE_DIR, "PowerShellScripts", "UserAccountActionScript.ps1")
@@ -13,6 +12,9 @@ SCRIPT_PATH = os.path.join(BASE_DIR, "PowerShellScripts", "UserAccountActionScri
 load_dotenv(ENV_PATH)
 app = Flask(__name__)
 API_KEY = os.getenv("API_KEY")
+
+if not API_KEY:
+    print("WARNING: API_KEY not found in .env file.")
 
 @app.route('/run-script', methods=['POST'])
 def run_script():
@@ -27,39 +29,49 @@ def run_script():
 
         if not upn or not action:
             return jsonify({"error": "Missing fields"}), 400
-
-        # ... (Validation logic remains the same) ...
+        
+        # Security validation
+        if action not in ["Enable", "Unlock"]:
+             return jsonify({"error": "Invalid action"}), 400
 
         # 2. Run PowerShell
-        # Note: We do NOT pass credentials here. The Service (Phase 3) handles auth.
         result = subprocess.run(
             [
                 r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
                 "-NoProfile",
-                "-NonInteractive", # Important for background tasks
+                "-NonInteractive", 
                 "-ExecutionPolicy", "Bypass",
-                "-File", SCRIPT_PATH, # Uses absolute path
+                "-File", SCRIPT_PATH,
                 "-UPN", upn,
                 "-Action", action
             ],
-            capture_output=True,
-            text=True
+            capture_output=True, # REQUIRED to populate stdout
+            text=True            # REQUIRED to make it a string, not bytes
         )
         
-        # Check standard error for PowerShell specific errors
-        if result.returncode != 0:
-             return jsonify({"error": "Script failed", "details": result.stderr}), 500
+        # 3. Capture the Output safely
+        stdout_text = result.stdout.strip() if result.stdout else ""
+        stderr_text = result.stderr.strip() if result.stderr else ""
 
+        # If the script failed (non-zero exit code), return error 500
+        if result.returncode != 0:
+             return jsonify({
+                 "error": "Script execution failed", 
+                 "details": stderr_text or "No error message captured."
+             }), 500
+
+        # 4. Success Response
         return jsonify({
             "upn": upn,
-            "status": result.stdout.strip(),
-            "stderr": result.stderr.strip()
+            "action": action,
+            "status": stdout_text or "Success (No output returned)", # Fallback text
+            "stderr": stderr_text
         })
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    # 3. Use Waitress for Production
-    print("Starting server on port 5000...")
+    print(f"Server starting on port 5000...")
+    print(f"Looking for script at: {SCRIPT_PATH}")
     serve(app, host="0.0.0.0", port=5000)
