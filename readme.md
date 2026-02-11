@@ -9,7 +9,6 @@ This repository contains my step-by-step guide on how I allowed cloud-based Powe
 ## **📁 Repository Structure**
 ```
 FlaskToPowerautomate/
-│── .venv/
 │    ├── RestAPIPowerShell.py                  # Flask REST API
 │    └── PowerShellScripts/
 │           └── UserAccountActionScript.ps1         # Example AD PowerShell script
