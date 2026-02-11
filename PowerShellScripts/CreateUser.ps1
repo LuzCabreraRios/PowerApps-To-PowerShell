@@ -1,5 +1,5 @@
 # 1. Define the password
-$Password = ConvertTo-SecureString "l0ck3d" -AsPlainText -Force
+$Password = ConvertTo-SecureString "l0ck3d0ut!" -AsPlainText -Force
 
 # 2. Create 'temp30' in the College/Users OU
 New-ADUser `
