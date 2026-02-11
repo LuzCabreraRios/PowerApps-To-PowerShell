@@ -19,23 +19,38 @@ if (!(Test-Path $logPath)) {
 }
 
 try {
+    # 1. Perform the Action
     switch ($Action) {
         "Unlock" {
             Unlock-ADAccount -Identity $UPN -ErrorAction Stop
-            $message = "SUCCESS - $UPN was unlocked."
+            $detail = "Account unlocked"
         }
 
         "Enable" {
             Enable-ADAccount -Identity $UPN -ErrorAction Stop
-            $message = "SUCCESS - $UPN was enabled."
+            $detail = "Account enabled"
         }
     }
 
+    # 2. Build the structured message (Matches your FAILED format)
+    # Format: SUCCESS - Action - UPN - Detail
+    $message = "SUCCESS - $Action - $UPN - $detail"
+
+    # 3. Log it with Timestamp
     "$(Get-Date) : $message" | Out-File $logPath -Append
-    Write-Output "Success"
+
+    # 4. Return it to Python (Standard Output)
+    Write-Output $message
 }
 catch {
     $errorMessage = $_.Exception.Message
-    "$(Get-Date) : FAILED - $Action - $UPN - $errorMessage" | Out-File $logPath -Append
-    Write-Output "Failed: $errorMessage"
+    
+    # Build the structured failure message
+    $failureMessage = "FAILED - $Action - $UPN - $errorMessage"
+
+    # Log it
+    "$(Get-Date) : $failureMessage" | Out-File $logPath -Append
+
+    # Return it to Python
+    Write-Output $failureMessage
 }
