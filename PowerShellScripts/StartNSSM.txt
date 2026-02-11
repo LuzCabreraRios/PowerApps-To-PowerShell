@@ -16,3 +16,69 @@ python -m venv venv
 
 # 4. Install the required libraries ONLY inside this bubble
 pip install flask python-dotenv waitress
+
+
+
+Step 1: Open Task Scheduler
+Inside your VM, click Start and type Task Scheduler.
+
+Open it.
+
+On the right side, click Create Task (not Basic Task).
+
+Step 2: General Tab (The Setup)
+Name: AD Automation API
+
+Security Options:
+
+Select "Run whether user is logged on or not". (This is crucial for unattended mode).
+
+Check "Run with highest privileges". (Required for Admin rights).
+
+Configure for: Windows Server 2022 (or Windows 10).
+
+Step 3: Triggers Tab (When to run)
+Click New...
+
+Begin the task: Select "At Startup".
+
+Click OK.
+
+Step 4: Actions Tab (What to run)
+This is where we point to your Virtual Environment.
+
+Click New...
+
+Action: Start a program.
+
+Program/script: Browse to your venv Python:
+C:\RestAPI\venv\Scripts\python.exe
+
+Add arguments: app.py
+
+Start in (Optional): C:\RestAPI
+(Do not leave "Start in" blank; Python needs to know where to find the .env file).
+
+Click OK.
+
+Step 5: Settings Tab (Reliability)
+Uncheck "Stop the task if it runs longer than..." (We want it running forever).
+
+Check "If the task fails, restart every:" -> Set to 1 minute. (This ensures it comes back if it crashes).
+
+Click OK.
+
+Step 6: Start It
+It will ask for your Administrator Password to save the task. Enter it.
+
+In the main list, find AD Automation API.
+
+Right-click it and select Run.
+(You won't see anything happen because it runs in the background).
+
+How to Verify It Is Working
+Since there is no black window, checking if it works is slightly different:
+
+Check Task Manager: Go to the Details tab and look for python.exe. It should be running as the SYSTEM or Administrator user.
+
+Send a Request: Use your PowerShell "Attack" script from your laptop (or a separate window). If it replies, you are live!
