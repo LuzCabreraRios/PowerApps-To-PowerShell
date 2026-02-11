@@ -1,0 +1,17 @@
+Invoke-WebRequest -Uri "https://nssm.cc/release/nssm-2.24.zip" -OutFile "C:\nssm.zip"
+Expand-Archive -Path "C:\nssm.zip" -DestinationPath "C:\nssm"
+
+Lock-ADAccount -Identity temp30 -ErrorAction Stop
+Disable-ADAccount -Identity $UPN -ErrorAction Stop
+
+# 1. Go to your project folder
+cd C:\RestAPI
+
+# 2. Create the virtual environment (folder named 'venv')
+python -m venv venv
+
+# 3. Activate it (You will see (venv) appear in the prompt)
+.\venv\Scripts\activate
+
+# 4. Install the required libraries ONLY inside this bubble
+pip install flask python-dotenv waitress
