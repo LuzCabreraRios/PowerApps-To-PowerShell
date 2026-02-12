@@ -1,139 +1,122 @@
-# **Power Automate → PowerShell Integration with REST API**
+# AD Automation: Power Automate → PowerShell REST API
 
-Execute on-premises PowerShell scripts securely from Power Automate using a **Flask REST API** and the **Microsoft On-Premises Data Gateway**.
+Execute on-premises Active Directory PowerShell scripts securely from Power Automate using a **Flask REST API** (running via Waitress) and the **Microsoft On-Premises Data Gateway**.
 
-This repository contains my step-by-step guide on how I allowed cloud-based Power Automate flows to trigger PowerShell tasks in my personal laptop, for implementation in AD in a later stage.
+This solution allows cloud-based flows to trigger sensitive AD tasks (Enable/Unlock) on a local Domain Controller without manual intervention.
 
 ---
 
-## **📁 Repository Structure**
+## 📁 Repository Structure
+
+```text
+FlaskToPowerAutomate/
+│
+├── .venv/                         # Python Virtual Environment (Authorized Sandbox)
+├── PowerShellScripts/
+│   ├── UserAccountActionScript.ps1      # Main AD Logic (Enable/Unlock)
+│   └── UserAccountActionLog.txt       # Local execution logs
+│
+├── .env                           # API Key storage (Create manually!)
+├── .gitignore                     # Git configuration to ignore sensitive files
+├── requirements.txt               # Python dependencies list
+└── RestAPIunattended.py           # Production Flask API (Waitress)
 ```
-FlaskToPowerautomate/
-│    ├── RestAPIPowerShell.py                  # Flask REST API
-│    └── PowerShellScripts/
-│           └── UserAccountActionScript.ps1         # Example AD PowerShell script
-```
 
 ---
 
-## **📌 Key Files**
-- **Flask API (Python):**  
-  [`.venv/RestAPIPowerShell.py`](.venv/RestAPIPowerShell.py)
+## ⚙️ Prerequisites & Setup
 
-- **PowerShell Script (AD Example):**  
-  [`.venv/PowerShellScripts/UserAccountActionScript.ps1`](.venv/PowerShellScripts/UserAccountActionScript.ps1)
+### 1. Identity & Permissions
+* **Service Account:** Create a dedicated AD service account (e.g., `svc_automation`).
+* **Delegation:** Delegate "Reset Password" and "Read/Write UserAccountControl" permissions to this account for the target Organizational Unit (OU).
 
----
+### 2. Software Requirements
+* **Git:** To clone the repository.
+* **Python 3.10+:** Ensure "Add to PATH" is selected during installation.
+* **On-Premises Data Gateway:** [Download Standard Mode Here](https://aka.ms/onpremgateway). Install it and link it to your Power Automate environment.
 
-## **📌 Overview**
-This solution enables Power Automate to execute PowerShell `.ps1` scripts on-premises by using:
-
-- A PowerShell script stored locally  
-- A lightweight Flask REST API  
-- A Microsoft On-Premises Data Gateway  
-- A Custom Connector in Power Automate  
-
-Use cases include:  
-✔ Disabling or unlocking AD accounts  
-✔ Running admin or maintenance scripts  
-✔ Returning logs or execution status to Power Automate  
-
----
-
-# **🧩 Step 1 – Create a Local PowerShell Script**
-
-Below is the example validation script.  
-Your production script (e.g., `DisableUser.ps1`) should follow similar structure.
-
-### **📄 Example Script (DisableUser.ps1)**  
-[`DisableUser.ps1`](.venv/PowerShellScripts/DisableUser.ps1)
+### 3. Environment Initialization
+Clone the repository and set up the isolated Python environment to prevent conflicts:
 
 ```powershell
-# DisableUser.ps1
-param(
-    [string]$UserUPN
-)
+# 1. Clone the repository
+git clone https://github.com/LuzCabreraRios/Flask C:\RestAPI
 
-Disable-ADAccount -Identity $UserUPN
+# 2. Go to your project folder
+cd C:\RestAPI
 
-Write-Output "User $UserUPN has been disabled."
+# 3. Create the virtual environment (folder named 'venv')
+python -m venv venv
+
+# 4. Activate it (You will see (venv) appear in the prompt)
+.\venv\Scripts\activate
+
+# 5. Install the required libraries ONLY inside this bubble
+pip install flask python-dotenv waitress
+```
+
+### 4. Configuration (.env)
+Create a file named `.env` in the root folder to store your secrets:
+```ini
+API_KEY=YourSuperSecretKeyHere
 ```
 
 ---
 
-# **🖥 Step 2 – Flask REST API**
+## 🚀 Deployment (Unattended Mode)
 
-The Python API is located at:
+To ensure the API runs 24/7 without a user logged in, use the **Windows Task Scheduler**.
 
-**📄 Flask API File:**  
-[`RestAPIPowerShell.py`](.venv/RestAPIPowerShell.py)
+### Step 1: Create Task
+* **Name:** `AD Automation API`
+* **Security:** Select **"Run whether user is logged on or not"** and check **"Run with highest privileges"**.
+* **Configure for:** Windows Server 2022.
 
-This API:
+### Step 2: Trigger
+* Set to **"At Startup"**.
 
-- Validates an API Key  
-- Receives a username or UPN from Power Automate  
-- Executes the PowerShell script  
-- Returns body to Power Automate
-- Test your endpoint locally
+### Step 3: Action
+* **Action:** Start a program.
+* **Program/script:** Browse to your venv Python executable:
+    `C:\RestAPI\venv\Scripts\python.exe`
+* **Add arguments:** `RestAPIunattended.py`
+* **Start in:** `C:\RestAPI`
+    *(Crucial: Python needs this to find the .env file)*
+
+### Step 4: Reliability (Settings)
+* Uncheck "Stop the task if it runs longer than...".
+* Set **"If the task fails, restart every:"** to **1 minute**.
+
+---
+
+## 🔌 Power Automate Integration
+
+### Custom Connector Setup
+1.  **General:** Enable **"Connect via on-premises data gateway"**.
+2.  **Security:** API Key (`x-api-key`).
+3.  **Definition (POST):**
+    * **Body Schema:** `{"upn": "user@wsc.local", "action": "Unlock"}`
+    * **Response Schema:** `{"upn": "string", "action": "string", "status": "string", "stderr": "string"}`
+
+### Local Testing (PowerShell)
+You can test the API locally before connecting it to the cloud:
+
 ```powershell
 $uri = "http://localhost:5000/run-script"
-$apiKey = "Paste API key here"
+$apiKey = "YourSuperSecretKeyHere"
 
 $body = @{
-    upn    = "user@domain.com"
+    upn    = "temp30@wsc.local"
     action = "Unlock"
 } | ConvertTo-Json
 
-$response = Invoke-RestMethod `
-    -Uri $uri `
-    -Method Post `
-    -Headers @{ "x-api-key" = $apiKey } `
-    -ContentType "application/json" `
-    -Body $body
-
+$response = Invoke-RestMethod -Uri $uri -Method Post -Headers @{"x-api-key"=$apiKey} -ContentType "application/json" -Body $body
 $response
 ```
 
 ---
 
-# **🔌 Step 3 – Install & Configure the On-Premises Data Gateway**
-
-1. Download: https://aka.ms/onpremgateway  
-2. Install on the machine running the Flask API  
-3. Sign in using your Power Automate account/Service Account 
-4. Select or create a gateway  
-5. Confirm the gateway status is **Online**  
-
-The gateway provides secure connectivity between cloud and on-prem systems.
-
----
-
-# **⚙ Step 4 – Create a Custom Connector in Power Automate**
-
-1. Go to **Power Automate → Custom Connectors → New → From blank**
-2. **Security:** Basic Authentication (Username and Password), or Windows Auth 
-3. **Definition:**
-   - Create a POST action  
-   - Request headers:  
-     - `Content-Type: application/json`  
-     - `x-api-key:` *(leave blank)*
-   - Request body: {"ADusername": "ADusername", "ADusername": "ADusername"}
-   - Response schema: `ADusername`, `stderr`, `status`
-   - After creating SHARE CONNECTOR WITH ORGANIZATION
-   - Add the connection to your flow or Power App
-4. **Test:**  
-   - Select your **On-Prem Data Gateway**  
-   - Enter your API key  
-   - Execute the connector → PowerShell runs locally  
-
----
-
-# **🚀 Summary**
-
-This repository demonstrates how to trigger internal PowerShell scripts from Power Automate through:
-
-✔ A secure Flask REST API that executes a PowerShell Script  
-✔ API Key authentication  
-✔ The Microsoft On-Premises Data Gateway  
-✔ A Power Automate Custom Connector  
-
+## 🛡️ Security Features
+* **Validation Gatekeeper:** Both Python and PowerShell scripts only allow `"Enable"` and `"Unlock"` actions. `"Disable"` or `"Delete"` commands are strictly blocked.
+* **Process Isolation:** The API runs within a `venv` to prevent global library conflicts.
+* **Audit Logging:** Every action is logged with a timestamp to `UserAccountActionLog.txt`.
